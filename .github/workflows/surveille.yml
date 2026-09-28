@@ -1,0 +1,47 @@
+name: Surveillance bourse Opéra
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_mail:
+        description: "Envoyer un mail de test"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: surveillance
+  cancel-in-progress: false
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la bourse
+        env:
+          GMAIL_EXPEDITEUR: ${{ secrets.GMAIL_EXPEDITEUR }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          DESTINATAIRES: ${{ secrets.DESTINATAIRES }}
+        run: |
+          if [ "${{ inputs.test_mail }}" = "true" ]; then
+            python3 surveille_opera.py --test-mail
+          else
+            python3 surveille_opera.py
+          fi
+
+      - name: Sauvegarder l'état
+        run: |
+          if ! git diff --quiet etat_opera.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add etat_opera.json
+            git commit -m "Mise à jour de l'état"
+            git push
+          fi
